@@ -1,5 +1,7 @@
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
+from os import path
 
 blur_ksize = 5  # Gaussian blur kernel size
 canny_lthreshold = 50  # Canny edge detection low threshold
@@ -43,7 +45,10 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
                             maxLineGap=max_line_gap)
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
     # draw_lines(line_img, lines)
-    draw_lanes(line_img, lines)
+    try:
+        draw_lanes(line_img, lines)
+    except TypeError:
+        pass
     return line_img
 
 
@@ -103,7 +108,7 @@ def calc_lane_vertices(point_list, ymin, ymax):
     return [(xmin, ymin), (xmax, ymax)]
 
 
-def process_an_image(img):
+def pipeline(img, process=None):
     roi_vtx = np.array(
         [[(0, img.shape[0]), (460, 325), (520, 325), (img.shape[1], img.shape[0])]])
 
@@ -115,24 +120,25 @@ def process_an_image(img):
                            threshold, min_line_length, max_line_gap)
     res_img = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
-    # plt.figure()
-    # plt.imshow(gray, cmap='gray')
-    # plt.savefig('../resources/gray.png', bbox_inches='tight')
-    # plt.figure()
-    # plt.imshow(blur_gray, cmap='gray')
-    # plt.savefig('../resources/blur_gray.png', bbox_inches='tight')
-    # plt.figure()
-    # plt.imshow(edges, cmap='gray')
-    # plt.savefig('../resources/edges.png', bbox_inches='tight')
-    # plt.figure()
-    # plt.imshow(roi_edges, cmap='gray')
-    # plt.savefig('../resources/roi_edges.png', bbox_inches='tight')
-    # plt.figure()
-    # plt.imshow(line_img, cmap='gray')
-    # plt.savefig('../resources/line_img.png', bbox_inches='tight')
-    # plt.figure()
-    # plt.imshow(res_img)
-    # plt.savefig('../resources/res_img.png', bbox_inches='tight')
-    # plt.show()
+    if process:
+        plt.figure()
+        plt.imshow(gray, cmap='gray')
+        plt.savefig(path.join(process, 'gray.png'), bbox_inches='tight')
+        plt.figure()
+        plt.imshow(blur_gray, cmap='gray')
+        plt.savefig(path.join(process, 'blur_gray.png'), bbox_inches='tight')
+        plt.figure()
+        plt.imshow(edges, cmap='gray')
+        plt.savefig(path.join(process, 'edges.png'), bbox_inches='tight')
+        plt.figure()
+        plt.imshow(roi_edges, cmap='gray')
+        plt.savefig(path.join(process, 'roi_edges.png'), bbox_inches='tight')
+        plt.figure()
+        plt.imshow(line_img, cmap='gray')
+        plt.savefig(path.join(process, 'line_img.png'), bbox_inches='tight')
+        plt.figure()
+        plt.imshow(res_img)
+        plt.savefig(path.join(process, 'res_img.png'), bbox_inches='tight')
+        plt.show()
 
     return res_img
