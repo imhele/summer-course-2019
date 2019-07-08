@@ -6,7 +6,7 @@ from os import path
 blur_ksize = 5  # Gaussian blur kernel size
 canny_lthreshold = 50  # Canny edge detection low threshold
 canny_hthreshold = 150  # Canny edge detection high threshold
-
+correct = True
 # Hough transform parameters
 rho = 1
 theta = np.pi / 180
@@ -40,13 +40,15 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
             cv2.line(img, (x1, y1), (x2, y2), color, thickness)
 
 
-def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
+def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap, correct):
     lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len,
                             maxLineGap=max_line_gap)
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-    # draw_lines(line_img, lines)
     try:
-        draw_lanes(line_img, lines)
+        if correct:
+            draw_lanes(line_img, lines)
+        else:
+            draw_lines(line_img, lines)
     except TypeError:
         pass
     return line_img
@@ -108,16 +110,29 @@ def calc_lane_vertices(point_list, ymin, ymax):
     return [(xmin, ymin), (xmax, ymax)]
 
 
-def pipeline(img, process=None):
-    roi_vtx = np.array(
+def pipeline(img, process=None, **params):
+    """
+    :param int blur_ksize: default to `5`  # Gaussian blur kernel size
+    :param int canny_lthreshold: default to `50`  # Canny edge detection low threshold
+    :param int canny_hthreshold: default to `150`  # Canny edge detection high threshold
+    - Hough transform parameters
+    :param int rho: default to `1`
+    :param float theta: default to `np.pi / 180`
+    :param int threshold: default to `15`
+    :param int min_line_length: default to `40`
+    :param int max_line_gap: default to `20`
+    """
+    global_dicts = globals()
+    for key in params:
+        global_dicts[key] = params[key]
+    roi_vtx = params['roi_vtx'] if 'roi_vtx' in params else np.array(
         [[(0, img.shape[0]), (460, 325), (520, 325), (img.shape[1], img.shape[0])]])
-
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     blur_gray = cv2.GaussianBlur(gray, (blur_ksize, blur_ksize), 0, 0)
     edges = cv2.Canny(blur_gray, canny_lthreshold, canny_hthreshold)
     roi_edges = roi_mask(edges, roi_vtx)
     line_img = hough_lines(roi_edges, rho, theta,
-                           threshold, min_line_length, max_line_gap)
+                           threshold, min_line_length, max_line_gap, correct)
     res_img = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
     if process:
@@ -139,6 +154,6 @@ def pipeline(img, process=None):
         plt.figure()
         plt.imshow(res_img)
         plt.savefig(path.join(process, 'res_img.png'), bbox_inches='tight')
-        plt.show()
+        # plt.show()
 
     return res_img

@@ -112,7 +112,7 @@ def pipeline(img):
     masked_edge_image = region_of_interest(
         edge_image, np.array([[v1, v2, v3, v4]], dtype=np.int32))
     rho = 2
-    theta = (np.pi)/180
+    theta = (np.pi) / 180
     threshold = 20
     min_line_len = 3
     max_line_gap = 40
