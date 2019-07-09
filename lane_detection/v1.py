@@ -129,6 +129,10 @@ def pipeline(img, **partial_settings):
 
     if save_dir is not None:
         plt.figure()
+        plt.imshow(img)
+        plt.savefig(path.join(save_dir, 'origin.png'), bbox_inches='tight')
+
+        plt.figure()
         plt.imshow(gray, cmap='gray')
         plt.savefig(path.join(save_dir, 'gray.png'), bbox_inches='tight')
 

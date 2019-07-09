@@ -21,7 +21,7 @@ settings = {
 }
 
 # img = VideoFileClip('D:/LaneLineDet/lane_v1.avi').get_frame(12)
-# res_img = v1.pipeline(img, path.abspath('build'), **settings)
+# res_img = v1.pipeline(img, **settings)
 
 # plt.figure()
 # plt.imshow(res_img)
