@@ -25,15 +25,15 @@ def draw_roi(img, vertices):
 
 
 def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap, central_gap,
-                correct=False, draw_color=[255, 0, 0], draw_thickness=8):
+                slope_range, correct=False, draw_color=[255, 0, 0], draw_thickness=8):
     lines = cv2.HoughLinesP(img, rho, theta, threshold, numpy.array([]),
                             minLineLength=min_line_len, maxLineGap=max_line_gap)
     line_img = numpy.zeros((img.shape[0], img.shape[1], 3), dtype=numpy.uint8)
     lines = previous_lines if lines is None else lines
     if lines is None:
         return line_img
-    draw_lanes(line_img, lines, draw_color,
-               draw_thickness, central_gap, correct)
+    draw_lanes(line_img, lines, draw_color, draw_thickness,
+               central_gap, slope_range, correct)
     return line_img
 
 
@@ -59,7 +59,13 @@ def draw_previous(img, color, thickness):
     cv2.line(img, *previous_vertices[1], color, thickness)
 
 
-def draw_lanes(img, lines, color, thickness, central_gap, correct=None):
+def is_slope_in_range(vertices, range):
+    slopes = [((l[1] - r[1]), (l[0] - r[0])) for l, r in vertices]
+    slopes = [y / x if x else 0 for y, x in slopes]
+    return abs(sum(slopes)) < range
+
+
+def draw_lanes(img, lines, color, thickness, central_gap, slope_range, correct=None):
     if correct is None:
         return draw_lines(img, lines, color, thickness)
 
@@ -81,12 +87,15 @@ def draw_lanes(img, lines, color, thickness, central_gap, correct=None):
     central_points_y = [y for x, y in central_points]
     if max(central_points_y) - min(central_points_y) > central_gap:
         return draw_previous(img, color, thickness)
+    vertices = (calc_lane_vertices(
+        left_points, *correct), calc_lane_vertices(right_points, *correct))
+    if not is_slope_in_range(vertices, slope_range):
+        return draw_previous(img, color, thickness)
     global_dicts = globals()
     global_dicts['previous_central_y'] = int(
         sum(central_points_y) / points_len)
     global_dicts['previous_lines'] = lines
-    global_dicts['previous_vertices'] = (calc_lane_vertices(
-        left_points, *correct), calc_lane_vertices(right_points, *correct))
+    global_dicts['previous_vertices'] = vertices
     draw_previous(img, color, thickness)
 
 
@@ -134,6 +143,7 @@ DEFAULT_SETTINGS = {
     'roi_vtx': None,
     'save_dir': None,
     'show_image': False,
+    'slope_range': 0.2,
     'theta': numpy.pi / 180,
     'threshold': 15,
 }
@@ -151,26 +161,27 @@ def pipeline(img, **partial_settings):
     :param int min_line_length: default to `40`
     :param int max_line_gap: default to `20`
     """
-    settings = dict(DEFAULT_SETTINGS)
-    settings.update(partial_settings)
-    roi_vtx = settings['roi_vtx']
-    save_dir = settings['save_dir']
-    show_image = settings['show_image']
-    blur_ksize = settings['blur_ksize']
+    sts = dict(DEFAULT_SETTINGS)
+    sts.update(partial_settings)
+    roi_vtx = sts['roi_vtx']
+    save_dir = sts['save_dir']
+    show_image = sts['show_image']
+    blur_ksize = sts['blur_ksize']
+    slope_range = sts['slope_range']
     if type(blur_ksize) is not tuple:
         blur_ksize = (blur_ksize, blur_ksize)
-    canny_lthreshold = settings['canny_lthreshold']
-    canny_hthreshold = settings['canny_hthreshold']
-    hough_lines_args = (settings['rho'], settings['theta'], settings['threshold'],
-                        settings['min_line_length'], settings['max_line_gap'], settings['central_gap'],
-                        settings['correct'], settings['draw_color'], settings['draw_thickness'])
+    canny_lthreshold = sts['canny_lthreshold']
+    canny_hthreshold = sts['canny_hthreshold']
+    hough_lines_args = (sts['rho'], sts['theta'], sts['threshold'], sts['min_line_length'],
+                        sts['max_line_gap'], sts['central_gap'], sts['slope_range'],
+                        sts['correct'], sts['draw_color'], sts['draw_thickness'])
 
     # process image
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     blur_gray = cv2.GaussianBlur(gray, blur_ksize, 0, 0)
     edges = cv2.Canny(blur_gray, canny_lthreshold, canny_hthreshold)
     roi_edges = roi_mask(edges, roi_vtx) if roi_vtx is not None else edges
-    roi_edges = draw_central_mask(roi_edges, settings['central_gap'])
+    roi_edges = draw_central_mask(roi_edges, sts['central_gap'])
     line_img = hough_lines(roi_edges, *hough_lines_args)
     res_img = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
@@ -203,7 +214,7 @@ def pipeline(img, **partial_settings):
         plt.imshow(res_img)
         plt.savefig(path.join(save_dir, 'res_img.png'), bbox_inches='tight')
 
-        if settings['show_image']:
+        if sts['show_image']:
             plt.show()
 
     return res_img
