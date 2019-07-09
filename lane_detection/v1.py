@@ -84,7 +84,7 @@ def draw_lanes(img, lines, color, thickness, central_gap, slope_range, correct=N
     points_len = min(len(left_points), len(right_points))
     central_points = [p for p in calc_central_points(
         left_points, right_points, points_len)]
-    central_points_y = [y for x, y in central_points]
+    central_points_y = [int(y) for x, y in central_points]
     if max(central_points_y) - min(central_points_y) > central_gap:
         return draw_previous(img, color, thickness)
     vertices = (calc_lane_vertices(
@@ -92,8 +92,7 @@ def draw_lanes(img, lines, color, thickness, central_gap, slope_range, correct=N
     if not is_slope_in_range(vertices, slope_range):
         return draw_previous(img, color, thickness)
     global_dicts = globals()
-    global_dicts['previous_central_y'] = int(
-        sum(central_points_y) / points_len)
+    global_dicts['previous_central_y'] = sum(central_points_y) // points_len
     global_dicts['previous_lines'] = lines
     global_dicts['previous_vertices'] = vertices
     draw_previous(img, color, thickness)
@@ -121,12 +120,30 @@ def calc_lane_vertices(point_list, ymin, ymax):
 
 
 def draw_central_mask(img, width):
-    if previous_central_y is None:
-        return img
-    left = (previous_central_y - width, img.shape[0])
-    right = (previous_central_y + width, img.shape[0])
-    vertices = numpy.array([[left, right, (right[0], 0), (left[0], 0)]])
-    return roi_mask(img, vertices, True)
+    if previous_central_y is not None:
+        left = (previous_central_y - width, img.shape[0])
+        right = (previous_central_y + width, img.shape[0])
+        vertices = numpy.array([[left, right, (right[0], 0), (left[0], 0)]])
+        img = roi_mask(img, vertices, True)
+    if previous_vertices is not None:
+        offset = width // 2
+        left_line, right_line = previous_vertices
+        right_line = list(right_line)
+        right_line.reverse()
+        vertices = [(x + offset, y) for x, y in left_line]
+        vertices += [(x - offset, y) for x, y in right_line]
+        if vertices[3][0] < vertices[0][0]:
+            center = (vertices[3][0] + vertices[0][0]) // 2
+            vertices[3] = (center, vertices[3][1])
+            vertices[0] = (center, vertices[0][1])
+        img = roi_mask(img, numpy.array([vertices]), True)
+    return img
+
+
+def draw_extra_masks(img, extra_masks):
+    for mask in extra_masks:
+        img = roi_mask(img, mask, True)
+    return img
 
 
 DEFAULT_SETTINGS = {
@@ -137,6 +154,7 @@ DEFAULT_SETTINGS = {
     'correct': False,
     'draw_color': [255, 0, 0],
     'draw_thickness': 8,
+    'extra_masks': (),
     'max_line_gap': 20,
     'min_line_length': 40,
     'rho': 1,
@@ -168,6 +186,7 @@ def pipeline(img, **partial_settings):
     show_image = sts['show_image']
     blur_ksize = sts['blur_ksize']
     slope_range = sts['slope_range']
+    extra_masks = sts['extra_masks']
     if type(blur_ksize) is not tuple:
         blur_ksize = (blur_ksize, blur_ksize)
     canny_lthreshold = sts['canny_lthreshold']
@@ -182,6 +201,7 @@ def pipeline(img, **partial_settings):
     edges = cv2.Canny(blur_gray, canny_lthreshold, canny_hthreshold)
     roi_edges = roi_mask(edges, roi_vtx) if roi_vtx is not None else edges
     roi_edges = draw_central_mask(roi_edges, sts['central_gap'])
+    roi_edges = draw_extra_masks(roi_edges, extra_masks)
     line_img = hough_lines(roi_edges, *hough_lines_args)
     res_img = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
