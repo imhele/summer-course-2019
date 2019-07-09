@@ -1,7 +1,11 @@
 import cv2
+import functools
 import matplotlib.pyplot as plt
 import numpy
 from os import path
+
+previous_lines = None
+previous_vertices = None
 
 
 def roi_mask(img, vertices):
@@ -16,17 +20,16 @@ def draw_roi(img, vertices):
     cv2.polylines(img, vertices, True, [255, 0, 0], thickness=2)
 
 
-def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap,
+def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap, central_gap,
                 correct=False, draw_color=[255, 0, 0], draw_thickness=8):
     lines = cv2.HoughLinesP(img, rho, theta, threshold, numpy.array([]),
                             minLineLength=min_line_len, maxLineGap=max_line_gap)
     line_img = numpy.zeros((img.shape[0], img.shape[1], 3), dtype=numpy.uint8)
+    lines = previous_lines if lines is None else lines
     if lines is None:
         return line_img
-    if correct:
-        draw_lanes(line_img, lines, draw_color, draw_thickness, correct)
-    else:
-        draw_lines(line_img, lines, draw_color, draw_thickness)
+    draw_lanes(line_img, lines, draw_color,
+               draw_thickness, central_gap, correct)
     return line_img
 
 
@@ -36,22 +39,49 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
             cv2.line(img, (x1, y1), (x2, y2), color, thickness)
 
 
-def draw_lanes(img, lines, color, thickness, correct=(0, 0)):
+def calc_central_points(left_points, right_points, points_len=8):
+    n = 0
+    while n < points_len:
+        center_left = left_points[n][0] + right_points[n][0]
+        center_right = left_points[n][1] + right_points[n][1]
+        yield (center_left / 2, center_right / 2)
+        n += 1
+
+
+def draw_previous(img, color, thickness):
+    if previous_lines is None or previous_vertices is None:
+        return
+    cv2.line(img, *previous_vertices[0], color, thickness)
+    cv2.line(img, *previous_vertices[1], color, thickness)
+
+
+def draw_lanes(img, lines, color, thickness, central_gap, correct=None):
+    if correct is None:
+        return draw_lines(img, lines, color, thickness)
+
     left_lines, right_lines = [], []
     for line in lines:
         for x1, y1, x2, y2 in line:
             k = (y2 - y1) / (x2 - x1)
             (left_lines if k < 0 else right_lines).append(line)
-    if (len(left_lines) <= 0 or len(right_lines) <= 0):
-        return img
     clean_lines(left_lines, 0.1), clean_lines(right_lines, 0.1)
+    if len(left_lines) <= 0 or len(right_lines) <= 0:
+        return draw_previous(img, color, thickness)
     left_points = [(x1, y1) for line in left_lines for x1, y1, *_ in line]
     left_points += [(x2, y2) for line in left_lines for *_, x2, y2 in line]
     right_points = [(x1, y1) for line in right_lines for x1, y1, *_ in line]
     right_points += [(x2, y2) for line in right_lines for *_, x2, y2 in line]
-
-    cv2.line(img, *calc_lane_vertices(left_points, *correct), color, thickness)
-    cv2.line(img, *calc_lane_vertices(right_points, *correct), color, thickness)
+    points_len = min(len(left_points), len(right_points))
+    central_points = [p for p in calc_central_points(
+        left_points, right_points, points_len)]
+    central_points_y = [y for x, y in central_points]
+    if max(central_points_y) - min(central_points_y) > central_gap:
+        return draw_previous(img, color, thickness)
+    global_dicts = globals()
+    global_dicts['previous_lines'] = lines
+    global_dicts['previous_vertices'] = (calc_lane_vertices(
+        left_points, *correct), calc_lane_vertices(right_points, *correct))
+    draw_previous(img, color, thickness)
 
 
 def clean_lines(lines, threshold):
@@ -79,6 +109,7 @@ DEFAULT_SETTINGS = {
     'blur_ksize': 5,
     'canny_lthreshold': 50,
     'canny_hthreshold': 150,
+    'central_gap': 32,
     'correct': False,
     'draw_color': [255, 0, 0],
     'draw_thickness': 8,
@@ -116,7 +147,7 @@ def pipeline(img, **partial_settings):
     canny_lthreshold = settings['canny_lthreshold']
     canny_hthreshold = settings['canny_hthreshold']
     hough_lines_args = (settings['rho'], settings['theta'], settings['threshold'],
-                        settings['min_line_length'], settings['max_line_gap'],
+                        settings['min_line_length'], settings['max_line_gap'], settings['central_gap'],
                         settings['correct'], settings['draw_color'], settings['draw_thickness'])
 
     # process image
