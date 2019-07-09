@@ -6,12 +6,16 @@ from os import path
 
 previous_lines = None
 previous_vertices = None
+previous_central_y = None
 
 
-def roi_mask(img, vertices):
+def roi_mask(img, vertices, out=False):
     mask = numpy.zeros_like(img)
     # (255, 255, 255) or (255, 255, 255, 255)
     mask_color = (255,) * img.shape[2] if len(img.shape) > 2 else 255
+    if out:
+        mask.fill(255)
+        mask_color = (0,) * img.shape[2] if len(img.shape) > 2 else 0
     cv2.fillPoly(mask, vertices, mask_color)
     return cv2.bitwise_and(img, mask)
 
@@ -78,6 +82,8 @@ def draw_lanes(img, lines, color, thickness, central_gap, correct=None):
     if max(central_points_y) - min(central_points_y) > central_gap:
         return draw_previous(img, color, thickness)
     global_dicts = globals()
+    global_dicts['previous_central_y'] = int(
+        sum(central_points_y) / points_len)
     global_dicts['previous_lines'] = lines
     global_dicts['previous_vertices'] = (calc_lane_vertices(
         left_points, *correct), calc_lane_vertices(right_points, *correct))
@@ -103,6 +109,15 @@ def calc_lane_vertices(point_list, ymin, ymax):
     fit = numpy.polyfit(y, x, 1)
     fit_fn = numpy.poly1d(fit)
     return [(int(fit_fn(ymin)), ymin), (int(fit_fn(ymax)), ymax)]
+
+
+def draw_central_mask(img, width):
+    if previous_central_y is None:
+        return img
+    left = (previous_central_y - width, img.shape[0])
+    right = (previous_central_y + width, img.shape[0])
+    vertices = numpy.array([[left, right, (right[0], 0), (left[0], 0)]])
+    return roi_mask(img, vertices, True)
 
 
 DEFAULT_SETTINGS = {
@@ -155,6 +170,7 @@ def pipeline(img, **partial_settings):
     blur_gray = cv2.GaussianBlur(gray, blur_ksize, 0, 0)
     edges = cv2.Canny(blur_gray, canny_lthreshold, canny_hthreshold)
     roi_edges = roi_mask(edges, roi_vtx) if roi_vtx is not None else edges
+    roi_edges = draw_central_mask(roi_edges, settings['central_gap'])
     line_img = hough_lines(roi_edges, *hough_lines_args)
     res_img = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
