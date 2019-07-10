@@ -26,6 +26,7 @@ settings = {
 # res_img = v1.pipeline(img, **settings)
 
 clip = VideoFileClip('D:/LaneLineDet/lane_v1.avi').subclip(10, 30)
+# clip.write_gif('C:/Users/me/Downloads/lane_v1.out_12_18.gif', fps=10, program='ffmpeg')
 out_clip = clip.fl_image(lambda img: v1.pipeline(img, **settings))
 out_clip.write_videofile(
-    'C:/Users/me/Downloads/lane_v1.out_10_30.avi', audio=False, codec='rawvideo')
+    'C:/Users/me/Downloads/lane_v1.out_10_30.mp4', bitrate='10240k', audio=False, codec='mpeg4')
