@@ -22,10 +22,10 @@ settings = {
     'extra_masks': (numpy.array([[(0, 350), (0, 334), (288, 334), (288, 350)]]),)
 }
 
-# img = VideoFileClip('D:/LaneLineDet/lane_v1.avi').get_frame(14)
+# img = VideoFileClip('D:/LaneLineDet/lane_v1.avi').get_frame(10.5)
 # res_img = v1.pipeline(img, **settings)
 
-clip = VideoFileClip('D:/LaneLineDet/lane_v1.avi').subclip(143, 163)
+clip = VideoFileClip('D:/LaneLineDet/lane_v1.avi').subclip(10, 30)
 out_clip = clip.fl_image(lambda img: v1.pipeline(img, **settings))
 out_clip.write_videofile(
-    'C:/Users/me/Downloads/lane_v1.out_143_163.avi', audio=False, codec='rawvideo')
+    'C:/Users/me/Downloads/lane_v1.out_10_30.avi', audio=False, codec='rawvideo')
