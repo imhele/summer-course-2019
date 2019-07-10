@@ -15,16 +15,17 @@ settings = {
     'max_line_gap': 32,
     'min_line_length': 45,
     'rho': 1,
-    'save_dir': path.abspath('build'),
+    # 'save_dir': path.abspath('build'),
     # 'show_image': True,
     'threshold': 15,
-    'roi_vtx': numpy.array([[(100, 328), (230, 256), (324, 256), (440, 328)]]),
+    'roi_vtx': numpy.array([[(70, 356), (230, 256), (324, 256), (500, 356)]]),
+    'extra_masks': (numpy.array([[(0, 350), (0, 334), (288, 334), (288, 350)]]),)
 }
 
-img = VideoFileClip('D:/LaneLineDet/lane_v1.avi').get_frame(78)
-res_img = v1.pipeline(img, **settings)
+# img = VideoFileClip('D:/LaneLineDet/lane_v1.avi').get_frame(14)
+# res_img = v1.pipeline(img, **settings)
 
-# clip = VideoFileClip('D:/LaneLineDet/lane_v1.avi').subclip(78, 83)
-# out_clip = clip.fl_image(lambda img: v1.pipeline(img, **settings))
-# out_clip.write_videofile(
-#     'C:/Users/me/Downloads/lane_v1.out_78_83.avi', audio=False, codec='rawvideo')
+clip = VideoFileClip('D:/LaneLineDet/lane_v1.avi').subclip(143, 163)
+out_clip = clip.fl_image(lambda img: v1.pipeline(img, **settings))
+out_clip.write_videofile(
+    'C:/Users/me/Downloads/lane_v1.out_143_163.avi', audio=False, codec='rawvideo')
